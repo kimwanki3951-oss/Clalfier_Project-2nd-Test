@@ -95,8 +95,9 @@ def copy_pipeline_outputs_to_drive() -> None:
 
     # Train / Validation / Test manifest
     copy_directory(
-        LOCAL_DATA_DIR / "manifests",
-        DRIVE_DATA_DIR / "manifests",
+        LOCAL_DATA_DIR / "splits",
+        DRIVE_DATA_DIR / "splits",
+)
     )
 
     # 재현성에 필요한 DVC 기록 파일
