@@ -98,7 +98,6 @@ def copy_pipeline_outputs_to_drive() -> None:
         LOCAL_DATA_DIR / "splits",
         DRIVE_DATA_DIR / "splits",
 )
-    )
 
     # 재현성에 필요한 DVC 기록 파일
     copy_file(
