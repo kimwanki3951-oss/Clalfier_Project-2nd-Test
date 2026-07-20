@@ -1,45 +1,131 @@
 from __future__ import annotations
 
+import shutil
 import subprocess
 from pathlib import Path
 
+
 PROJECT_ROOT = Path(__file__).resolve().parent
-REMOTE_NAME = "gdrive_storage"
-GDRIVE_FOLDER_ID = "1nVaOpihiS5mKL0eJwxj-D8-1WKA17PAJ"
-GDRIVE_URL = f"gdrive://{GDRIVE_FOLDER_ID}"
+LOCAL_DATA_DIR = PROJECT_ROOT / "data"
+
+# Colab에서 drive.mount("/content/drive") 실행 후 접근 가능한 경로
+DRIVE_ROOT = Path("/content/drive/MyDrive")
+
+# Google Drive 안에 저장할 폴더
+DRIVE_PROJECT_DIR = DRIVE_ROOT / "Clalfier_Project-2nd-Test"
+DRIVE_DATA_DIR = DRIVE_PROJECT_DIR / "data"
 
 
 def run(command: list[str]) -> None:
     print("\n" + "=" * 72)
     print("[RUN]", " ".join(command))
     print("=" * 72)
-    subprocess.run(command, cwd=PROJECT_ROOT, check=True)
+
+    subprocess.run(
+        command,
+        cwd=PROJECT_ROOT,
+        check=True,
+    )
 
 
 def ensure_dvc_repository() -> None:
     if (PROJECT_ROOT / ".dvc").exists():
         print("[DVC] Existing DVC repository detected.")
         return
+
     print("[DVC] Initializing DVC repository.")
     run(["dvc", "init"])
 
 
-def configure_remote() -> None:
-    run(["dvc", "remote", "add", "--default", "--force", REMOTE_NAME, GDRIVE_URL])
-    print(f"[DVC] Default remote: {REMOTE_NAME}")
-    print(f"[DVC] Google Drive folder ID: {GDRIVE_FOLDER_ID}")
+def ensure_drive_mounted() -> None:
+    if not DRIVE_ROOT.exists():
+        raise RuntimeError(
+            "Google Drive가 마운트되지 않았습니다.\n"
+            "Colab에서 아래 코드를 먼저 실행하세요:\n\n"
+            "from google.colab import drive\n"
+            "drive.mount('/content/drive')"
+        )
+
+    print(f"[DRIVE] Google Drive detected: {DRIVE_ROOT}")
+
+
+def copy_directory(source: Path, destination: Path) -> None:
+    if not source.exists():
+        print(f"[SKIP] Source directory not found: {source}")
+        return
+
+    if destination.exists():
+        print(f"[REMOVE] Existing Drive directory: {destination}")
+        shutil.rmtree(destination)
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+
+    print(f"[COPY] {source}")
+    print(f"    -> {destination}")
+
+    shutil.copytree(source, destination)
+
+    print(f"[COPY] Completed: {destination}")
+
+
+def copy_file(source: Path, destination: Path) -> None:
+    if not source.exists():
+        print(f"[SKIP] Source file not found: {source}")
+        return
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+
+    print(f"[COPY] {source}")
+    print(f"    -> {destination}")
+
+
+def copy_pipeline_outputs_to_drive() -> None:
+    print("\n" + "=" * 72)
+    print("[DRIVE] Copying pipeline outputs to Google Drive")
+    print("=" * 72)
+
+    DRIVE_DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    # 원본 Kaggle 데이터
+    copy_directory(
+        LOCAL_DATA_DIR / "raw",
+        DRIVE_DATA_DIR / "raw",
+    )
+
+    # Train / Validation / Test manifest
+    copy_directory(
+        LOCAL_DATA_DIR / "manifests",
+        DRIVE_DATA_DIR / "manifests",
+    )
+
+    # 재현성에 필요한 DVC 기록 파일
+    copy_file(
+        PROJECT_ROOT / "dvc.lock",
+        DRIVE_PROJECT_DIR / "dvc.lock",
+    )
+
+    copy_file(
+        PROJECT_ROOT / "params.yaml",
+        DRIVE_PROJECT_DIR / "params.yaml",
+    )
 
 
 def main() -> None:
+    ensure_drive_mounted()
     ensure_dvc_repository()
-    configure_remote()
+
+    # Kaggle 다운로드 및 데이터 분할
     run(["dvc", "repro"])
-    print("\n[DVC] Starting Google Drive push.")
-    print("[DVC] First use may request Google OAuth authentication.")
-    print("[DVC] Sign in with an account that has write access to the folder.")
-    run(["dvc", "push"])
-    print("\n[DONE] Dataset pipeline reproduced and pushed to Google Drive.")
-    print("[DONE] Commit dvc.lock and project config files to GitHub.")
+
+    # DVC push 대신 마운트된 Drive로 직접 복사
+    copy_pipeline_outputs_to_drive()
+
+    print("\n" + "=" * 72)
+    print("[DONE] Dataset pipeline completed.")
+    print(f"[DONE] Google Drive location: {DRIVE_PROJECT_DIR}")
+    print("[DONE] Commit dvc.lock and updated source files to GitHub.")
+    print("=" * 72)
 
 
 if __name__ == "__main__":
