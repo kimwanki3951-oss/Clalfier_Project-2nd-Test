@@ -1,0 +1,22 @@
+stages:
+  download:
+    cmd: python src/data/download.py
+    deps:
+      - src/data/download.py
+    params:
+      - data.kaggle_dataset
+    outs:
+      - data/raw
+
+  split:
+    cmd: python src/data/split.py
+    deps:
+      - data/raw
+      - src/data/split.py
+    params:
+      - data.seed
+      - data.train_ratio
+      - data.valid_ratio
+      - data.test_ratio
+    outs:
+      - data/splits

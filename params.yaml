@@ -1,0 +1,15 @@
+data:
+  kaggle_dataset: "kritikseth/fruit-and-vegetable-image-recognition"
+  seed: 42
+  train_ratio: 0.70
+  valid_ratio: 0.15
+  test_ratio: 0.15
+
+loader:
+  img_size: 224
+  batch_size: 64
+  num_workers: 2
+
+train:
+  epochs: 10
+  lr: 0.001
